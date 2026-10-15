@@ -331,7 +331,8 @@ async function ensureTabGroup(createIfEmpty) {
   const win = await chrome.windows.create({ focused: false, url: "about:blank" });
   const tab = win.tabs[0];
   const groupId = await chrome.tabs.group({ tabIds: [tab.id] });
-  await chrome.tabGroups.update(groupId, { title: "Lily", color: "yellow" });
+  // "cyan" is the closest of Chrome's named tab-group colors to Lily's teal.
+  await chrome.tabGroups.update(groupId, { title: "Lily", color: "cyan" });
   tabGroupId = groupId;
   tabGroupTabs = new Set([tab.id]);
 }
@@ -861,7 +862,23 @@ async function sendMouseEvent(tabId, params, { awaitAck = true, noAck = false } 
   ]);
 }
 
+// Paint the visible teal cursor in the page so the operator can watch Lily move
+// and click. The real pointer here is a synthetic CDP event — the OS cursor
+// never moves — so without this the page gives no sign of where Lily is acting.
+// Best-effort and fire-and-forget; pages where the content script cannot run
+// (chrome://, a blank new tab) simply show nothing.
+function paintCursor(tabId, type, x, y) {
+  try {
+    chrome.tabs.sendMessage(
+      tabId,
+      { type: "lily:cursor", x, y, click: type === "mousePressed" },
+      () => void chrome.runtime.lastError,
+    );
+  } catch {}
+}
+
 async function dispatchMouse(tabId, type, x, y, opts = {}) {
+  paintCursor(tabId, type, x, y);
   if (opts.noAck) {
     await sendMouseEvent(
       tabId,

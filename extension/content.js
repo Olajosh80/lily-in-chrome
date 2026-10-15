@@ -583,9 +583,10 @@
   }
 
   // --- Lily ambient control border ---
-  // A soft yellow glow framing the viewport while Lily is driving this tab, so
-  // it is always visible that the browser is under agent control. Pointer-events
-  // none so it never intercepts a click; injected once and toggled by opacity.
+  // A soft teal glow (Lily's #35C9C3) framing the viewport while Lily is driving
+  // this tab, so it is always visible that the browser is under agent control.
+  // Pointer-events none so it never intercepts a click; injected once and
+  // toggled by opacity.
   let lilyBorderEl = null;
   function setLilyControlBorder(on) {
     try {
@@ -602,21 +603,78 @@
           lilyBorderEl.setAttribute("aria-hidden", "true");
           lilyBorderEl.style.cssText =
             "position:fixed;inset:0;z-index:2147483647;pointer-events:none;" +
-            "box-shadow:inset 0 0 0 3px rgba(245,197,24,.95),inset 0 0 24px 7px rgba(245,197,24,.33);" +
+            "box-shadow:inset 0 0 0 3px rgba(53,201,195,.95),inset 0 0 24px 7px rgba(53,201,195,.33);" +
             "transition:opacity .25s ease;animation:lilyAmbientPulse 2.4s ease-in-out infinite;";
           (document.body || document.documentElement).appendChild(lilyBorderEl);
         }
         lilyBorderEl.style.opacity = "1";
       } else if (lilyBorderEl) {
         lilyBorderEl.style.opacity = "0";
+        hideLilyCursor();
       }
     } catch {}
+  }
+
+  // --- Lily visible cursor (teal #35C9C3) ---
+  // The real pointer is a synthetic CDP event, so the OS cursor never moves.
+  // This draws a soft teal ring that follows where Lily is acting, with a pulse
+  // on each click, so the operator can watch along. Pointer-events none.
+  let lilyCursorEl = null;
+  function ensureLilyCursor() {
+    if (lilyCursorEl && document.body && document.body.contains(lilyCursorEl)) {
+      return lilyCursorEl;
+    }
+    if (!document.getElementById("lily-cursor-style")) {
+      const style = document.createElement("style");
+      style.id = "lily-cursor-style";
+      style.textContent =
+        "@keyframes lilyClickPulse{0%{transform:translate(-50%,-50%) scale(1);opacity:.85}" +
+        "100%{transform:translate(-50%,-50%) scale(2.8);opacity:0}}";
+      (document.head || document.documentElement).appendChild(style);
+    }
+    const el = document.createElement("div");
+    el.id = "lily-cursor";
+    el.setAttribute("aria-hidden", "true");
+    el.style.cssText =
+      "position:fixed;left:-100px;top:-100px;width:18px;height:18px;z-index:2147483647;" +
+      "pointer-events:none;border-radius:50%;background:rgba(53,201,195,.35);" +
+      "border:2px solid rgba(53,201,195,.95);box-shadow:0 0 8px 2px rgba(53,201,195,.45);" +
+      "transform:translate(-50%,-50%);transition:left .12s ease-out,top .12s ease-out,opacity .2s;opacity:0;";
+    (document.body || document.documentElement).appendChild(el);
+    lilyCursorEl = el;
+    return el;
+  }
+  function setLilyCursor(x, y, clicking) {
+    try {
+      const el = ensureLilyCursor();
+      el.style.left = x + "px";
+      el.style.top = y + "px";
+      el.style.opacity = "1";
+      if (clicking) {
+        const ring = document.createElement("div");
+        ring.setAttribute("aria-hidden", "true");
+        ring.style.cssText =
+          "position:fixed;left:" + x + "px;top:" + y + "px;width:18px;height:18px;" +
+          "z-index:2147483647;pointer-events:none;border-radius:50%;" +
+          "border:2px solid rgba(53,201,195,.9);transform:translate(-50%,-50%);" +
+          "animation:lilyClickPulse .5s ease-out forwards;";
+        (document.body || document.documentElement).appendChild(ring);
+        setTimeout(() => ring.remove(), 550);
+      }
+    } catch {}
+  }
+  function hideLilyCursor() {
+    if (lilyCursorEl) lilyCursorEl.style.opacity = "0";
   }
 
   // --- Message handler ---
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.type === "lily:control") {
       setLilyControlBorder(msg.on);
+      return;
+    }
+    if (msg.type === "lily:cursor") {
+      setLilyCursor(msg.x, msg.y, msg.click);
       return;
     }
 
