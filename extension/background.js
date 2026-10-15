@@ -131,6 +131,27 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
+// --- Voice typing shortcut ---
+// The keyboard shortcut (default Alt+Shift+D; configurable at
+// chrome://extensions/shortcuts) toggles free, multilingual dictation into the
+// focused field of the active tab. The content script owns the Web Speech API;
+// here we just relay the toggle.
+if (chrome.commands && chrome.commands.onCommand) {
+  chrome.commands.onCommand.addListener((command) => {
+    if (command !== "toggle-dictation") return;
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tab = tabs[0];
+      if (tab && tab.id != null) {
+        chrome.tabs.sendMessage(
+          tab.id,
+          { type: "lily:dictate-toggle" },
+          () => void chrome.runtime.lastError,
+        );
+      }
+    });
+  });
+}
+
 // --- Native messaging ---
 function connectNativeHost() {
   if (nativePort) return;

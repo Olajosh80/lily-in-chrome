@@ -667,6 +667,116 @@
     if (lilyCursorEl) lilyCursorEl.style.opacity = "0";
   }
 
+  // --- Lily voice typing (free, multilingual) ---
+  // Dictate into the focused field using the browser's built-in Web Speech API:
+  // no key, no per-use cost. Transcribes in the user's own browser locale, so it
+  // works across languages. Toggled by the extension's keyboard shortcut (see
+  // the background command). A teal pill shows it is listening.
+  let lilyRec = null;
+  let lilyPill = null;
+
+  function insertIntoFocused(text) {
+    const el = document.activeElement;
+    if (!el) return false;
+    const tag = el.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA") {
+      const start = typeof el.selectionStart === "number" ? el.selectionStart : el.value.length;
+      const end = typeof el.selectionEnd === "number" ? el.selectionEnd : el.value.length;
+      el.value = el.value.slice(0, start) + text + el.value.slice(end);
+      const pos = start + text.length;
+      try {
+        el.selectionStart = el.selectionEnd = pos;
+      } catch {
+        // some input types (email/number) forbid setSelectionRange; ignore
+      }
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      return true;
+    }
+    if (el.isContentEditable) {
+      document.execCommand("insertText", false, text);
+      return true;
+    }
+    return false;
+  }
+
+  function setLilyPill(on, label) {
+    if (on) {
+      if (!lilyPill) {
+        lilyPill = document.createElement("div");
+        lilyPill.setAttribute("aria-hidden", "true");
+        lilyPill.style.cssText =
+          "position:fixed;bottom:18px;right:18px;z-index:2147483647;pointer-events:none;" +
+          "display:flex;align-items:center;gap:7px;padding:7px 12px;border-radius:999px;" +
+          "background:rgba(53,201,195,.14);border:1.5px solid #35C9C3;color:#0b6b67;" +
+          "font:600 12px system-ui,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.12);" +
+          "backdrop-filter:blur(4px);";
+        lilyPill.innerHTML =
+          '<span style="width:9px;height:9px;border-radius:50%;background:#35C9C3;' +
+          'animation:lilyAmbientPulse 1.2s ease-in-out infinite;"></span><span></span>';
+        (document.body || document.documentElement).appendChild(lilyPill);
+      }
+      lilyPill.lastChild.textContent = label || "Listening…";
+      lilyPill.style.display = "flex";
+    } else if (lilyPill) {
+      lilyPill.style.display = "none";
+    }
+  }
+
+  function stopLilyDictation() {
+    if (lilyRec) {
+      try {
+        lilyRec.stop();
+      } catch {
+        // already stopping
+      }
+    }
+  }
+
+  function startLilyDictation() {
+    const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Ctor) {
+      setLilyPill(true, "Voice typing not supported here");
+      setTimeout(() => setLilyPill(false), 2500);
+      return;
+    }
+    const rec = new Ctor();
+    // Multilingual: follow the user's browser locale.
+    rec.lang = navigator.language || "en-US";
+    rec.continuous = true;
+    rec.interimResults = false;
+    rec.onresult = (e) => {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) {
+          const t = (r[0] && r[0].transcript ? r[0].transcript : "").trim();
+          if (t) insertIntoFocused(t + " ");
+        }
+      }
+    };
+    rec.onerror = (e) => {
+      if (e && e.error === "not-allowed") {
+        setLilyPill(true, "Mic blocked");
+        setTimeout(() => setLilyPill(false), 2500);
+      }
+    };
+    rec.onend = () => {
+      lilyRec = null;
+      setLilyPill(false);
+    };
+    lilyRec = rec;
+    try {
+      rec.start();
+      setLilyPill(true, "Listening… speak to type");
+    } catch {
+      lilyRec = null;
+    }
+  }
+
+  function toggleLilyDictation() {
+    if (lilyRec) stopLilyDictation();
+    else startLilyDictation();
+  }
+
   // --- Message handler ---
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (msg.type === "lily:control") {
@@ -675,6 +785,10 @@
     }
     if (msg.type === "lily:cursor") {
       setLilyCursor(msg.x, msg.y, msg.click);
+      return;
+    }
+    if (msg.type === "lily:dictate-toggle") {
+      toggleLilyDictation();
       return;
     }
 

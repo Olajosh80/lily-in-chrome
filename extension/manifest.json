@@ -27,6 +27,15 @@
   "action": {
     "default_title": "Lily in Chrome \u2014 click to start/stop recording"
   },
+  "commands": {
+    "toggle-dictation": {
+      "suggested_key": {
+        "default": "Alt+Shift+D",
+        "mac": "Alt+Shift+D"
+      },
+      "description": "Lily: voice-type into the focused field (free, multilingual)"
+    }
+  },
   "options_page": "recorder/options.html",
   "content_scripts": [
     {
