@@ -44,6 +44,17 @@ function writeNativeMessage(obj) {
   process.stdout.write(Buffer.concat([header, buf]));
 }
 
+// Tell the extension whether anyone (Lily, an MCP client) is currently attached,
+// so its MV3 service worker can hold itself awake ONLY while it is actually
+// driving — and let itself idle the moment the last client leaves. Without this
+// the worker is evicted after ~30s, the native port dies mid-session, and
+// forwarded tool_requests vanish into a worker that is no longer there.
+function sendClientPresence() {
+  try {
+    writeNativeMessage({ type: "set_keepalive", active: clients.size > 0 });
+  } catch {}
+}
+
 // --- Who owns the bridge ---
 //
 // Exactly one process has to own the rendezvous, because native messaging gives
@@ -165,6 +176,7 @@ function attachClient(socket, initialBuffer) {
   clients.set(clientId, socket);
   process.stderr.write(`MCP client ${clientId} attached (${clients.size} total)\n`);
   socket.write(JSON.stringify({ type: "client_ack", clientId }) + "\n");
+  sendClientPresence();
 
   let buffer = initialBuffer;
 
@@ -200,6 +212,7 @@ function attachClient(socket, initialBuffer) {
       if (info.clientId === clientId) clientRequestMap.delete(prefixedId);
     }
     process.stderr.write(`MCP client ${clientId} detached (${clients.size} left)\n`);
+    sendClientPresence();
   });
 }
 
@@ -443,6 +456,20 @@ process.stdin.on("data", (chunk) => {
   }
 });
 
+// Free the rendezvous the instant this host stops owning it, so the host
+// Chrome spawns next binds without waiting on anyone's clearStaleSocket. A
+// POSIX unix-socket path lingers after close(); a Windows named pipe does not.
+function freeSocket() {
+  try {
+    pipeServer.close();
+  } catch {}
+  if (process.platform !== "win32") {
+    try {
+      fs.unlinkSync(PIPE_PATH);
+    } catch {}
+  }
+}
+
 process.stdin.on("end", () => {
   recordExit(`extension disconnected (clients: ${clients.size})`);
   // Extension disconnected. Drop the bridge immediately rather than lingering:
@@ -453,9 +480,7 @@ process.stdin.on("end", () => {
       socket.destroy();
     } catch {}
   }
-  try {
-    pipeServer.close();
-  } catch {}
+  freeSocket();
   process.exit(0);
 });
 
@@ -504,6 +529,7 @@ setInterval(() => {
     `(heartbeats seen: ${heartbeatsSeen}, clients: ${clients.size})`;
   process.stderr.write(`${reason} — exiting so a fresh host can take the bridge.\n`);
   recordExit(reason);
+  freeSocket();
   process.exit(0);
 }, 15_000).unref();
 

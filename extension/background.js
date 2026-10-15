@@ -148,6 +148,12 @@ function connectNativeHost() {
       // are intentionally ignored here — only tool_request kicks work.
       if (msg.type === "tool_request" && msg.id) {
         handleToolRequest(msg.id, msg.tool, msg.args || {});
+      } else if (msg.type === "set_keepalive") {
+        // The host reports whether a client (Lily) is attached. Hold the
+        // service worker awake only while one is, so the native port cannot die
+        // mid-session; let it idle again when the last client leaves.
+        if (msg.active) startStrongKeepAlive();
+        else stopStrongKeepAlive();
       } else if (msg.type === "recording_saved") {
         // Reply from the native host after writing a recording bundle to disk.
         const resolve = recorder.pendingSaves.get(String(msg.recording_id));
@@ -219,6 +225,47 @@ function stopHeartbeat() {
     heartbeatTimer = null;
   }
 }
+
+// --- Strong keep-alive while a client is driving ---
+// An MV3 service worker is evicted after ~30s idle, which kills the native port
+// under an in-flight request — the failure that made the bridge intermittent.
+// The 15s heartbeat posts a native message, but that did not reliably reset
+// Chrome's idle timer. A cheap async chrome API call DOES count as activity, so
+// while a client (Lily) is attached we call one every ~20s and the worker stays
+// alive continuously. The attached state is persisted in session storage so a
+// worker that is torn down and restarted (e.g. by the keepalive alarm) re-arms
+// itself. When the last client detaches we stop, and the worker idles normally
+// again — zero background cost when nothing is driving.
+let keepAliveTimer = null;
+function startStrongKeepAlive() {
+  try {
+    chrome.storage.session.set({ lilyKeepAlive: true });
+  } catch {}
+  if (keepAliveTimer) return;
+  keepAliveTimer = setInterval(() => {
+    try {
+      chrome.runtime.getPlatformInfo(() => void chrome.runtime.lastError);
+    } catch {}
+    if (!nativePort) connectNativeHost();
+  }, 20000);
+}
+
+function stopStrongKeepAlive() {
+  if (keepAliveTimer) {
+    clearInterval(keepAliveTimer);
+    keepAliveTimer = null;
+  }
+  try {
+    chrome.storage.session.set({ lilyKeepAlive: false });
+  } catch {}
+}
+
+// Re-arm after a service-worker restart if a client was attached when it slept.
+try {
+  chrome.storage.session.get("lilyKeepAlive", (v) => {
+    if (v && v.lilyKeepAlive) startStrongKeepAlive();
+  });
+} catch {}
 
 function sendResponse(id, result) {
   if (!nativePort) return;
