@@ -582,8 +582,44 @@
     return `<${el.tagName.toLowerCase()}${id}${cls}>${t ? ` "${t}"` : ""}`;
   }
 
+  // --- Lily ambient control border ---
+  // A soft yellow glow framing the viewport while Lily is driving this tab, so
+  // it is always visible that the browser is under agent control. Pointer-events
+  // none so it never intercepts a click; injected once and toggled by opacity.
+  let lilyBorderEl = null;
+  function setLilyControlBorder(on) {
+    try {
+      if (on) {
+        if (!document.getElementById("lily-ambient-style")) {
+          const style = document.createElement("style");
+          style.id = "lily-ambient-style";
+          style.textContent = "@keyframes lilyAmbientPulse{0%,100%{opacity:.78}50%{opacity:1}}";
+          (document.head || document.documentElement).appendChild(style);
+        }
+        if (!lilyBorderEl) {
+          lilyBorderEl = document.createElement("div");
+          lilyBorderEl.id = "lily-ambient-border";
+          lilyBorderEl.setAttribute("aria-hidden", "true");
+          lilyBorderEl.style.cssText =
+            "position:fixed;inset:0;z-index:2147483647;pointer-events:none;" +
+            "box-shadow:inset 0 0 0 3px rgba(245,197,24,.95),inset 0 0 24px 7px rgba(245,197,24,.33);" +
+            "transition:opacity .25s ease;animation:lilyAmbientPulse 2.4s ease-in-out infinite;";
+          (document.body || document.documentElement).appendChild(lilyBorderEl);
+        }
+        lilyBorderEl.style.opacity = "1";
+      } else if (lilyBorderEl) {
+        lilyBorderEl.style.opacity = "0";
+      }
+    } catch {}
+  }
+
   // --- Message handler ---
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg.type === "lily:control") {
+      setLilyControlBorder(msg.on);
+      return;
+    }
+
     if (msg.type === "generateAccessibilityTree") {
       const result = generateAccessibilityTree(msg.options || {});
       sendResponse({ result });

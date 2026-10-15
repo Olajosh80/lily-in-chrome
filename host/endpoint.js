@@ -20,7 +20,7 @@ function configFile() {
   try {
     return JSON.parse(
       fs.readFileSync(
-        path.join(os.homedir(), ".config", "open-claude-in-chrome", "config.json"),
+        path.join(os.homedir(), ".config", "lily-in-chrome", "config.json"),
         "utf-8"
       )
     );
@@ -46,6 +46,7 @@ function currentUser() {
 export function getPipePath() {
   // Env override first, so a test harness can stand up a whole host + client
   // fleet on a scratch address without disturbing the live one.
+  if (process.env.LILY_CHROME_PIPE) return process.env.LILY_CHROME_PIPE;
   if (process.env.OCIC_PIPE) return process.env.OCIC_PIPE;
   const configured = configFile().pipe;
   if (configured) return configured;
@@ -53,7 +54,7 @@ export function getPipePath() {
   // POSIX socket paths are length-limited (~104 bytes), so keep both short.
   const user = currentUser().replace(/[^\w.-]/g, "_").slice(0, 32);
   if (process.platform === "win32") {
-    return `\\\\.\\pipe\\open-claude-in-chrome-${user}`;
+    return `\\\\.\\pipe\\lily-in-chrome-${user}`;
   }
   return path.join(socketDir(), "bridge.sock");
 }
@@ -68,7 +69,7 @@ export function socketDir() {
   } catch {}
   return path.join(
     os.tmpdir(),
-    `open-claude-in-chrome-${uid ?? currentUser().replace(/[^\w.-]/g, "_")}`
+    `lily-in-chrome-${uid ?? currentUser().replace(/[^\w.-]/g, "_")}`
   );
 }
 

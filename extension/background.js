@@ -9,7 +9,7 @@ self.addEventListener("unhandledrejection", (event) => {
   event.preventDefault();
 });
 
-const NATIVE_HOST_NAME = "com.anthropic.open_claude_in_chrome";
+const NATIVE_HOST_NAME = "com.pathvela.lily_in_chrome";
 
 // --- State ---
 let nativePort = null;
@@ -36,6 +36,15 @@ function recordTiming(entry) {
   }
 }
 const attachedTabs = new Map(); // tabId -> { enabledDomains: Set }
+
+// Tell a tab's content script to show or hide Lily's ambient control border
+// (the yellow glow that says "Lily is driving this tab"). Best-effort: a tab
+// with no content script (chrome://, the web store) simply has no listener.
+function signalControl(tabId, on) {
+  try {
+    chrome.tabs.sendMessage(tabId, { type: "lily:control", on }, () => void chrome.runtime.lastError);
+  } catch {}
+}
 const consoleMessages = new Map(); // tabId -> [{level, text, timestamp, url}]
 const networkRequests = new Map(); // tabId -> [{url, method, status, type, timestamp}]
 // tabId -> Map<requestId, record> — lets responseReceived augment the entry
@@ -275,7 +284,7 @@ async function ensureTabGroup(createIfEmpty) {
   const win = await chrome.windows.create({ focused: false, url: "about:blank" });
   const tab = win.tabs[0];
   const groupId = await chrome.tabs.group({ tabIds: [tab.id] });
-  await chrome.tabGroups.update(groupId, { title: "MCP", color: "blue" });
+  await chrome.tabGroups.update(groupId, { title: "Lily", color: "yellow" });
   tabGroupId = groupId;
   tabGroupTabs = new Set([tab.id]);
 }
@@ -311,7 +320,7 @@ async function isInGroup(tabId) {
       if (tabGroupId === null) {
         try {
           const group = await chrome.tabGroups.get(tab.groupId);
-          if (group.title === "MCP") {
+          if (group.title === "Lily") {
             tabGroupId = group.id;
             const groupTabs = await chrome.tabs.query({ groupId: tabGroupId });
             tabGroupTabs = new Set(groupTabs.map((t) => t.id));
@@ -351,6 +360,7 @@ async function ensureAttached(tabId) {
   const attach = (async () => {
     await chrome.debugger.attach({ tabId }, "1.3");
     attachedTabs.set(tabId, { enabledDomains: new Set() });
+    signalControl(tabId, true); // show Lily's ambient border while in control
   // No device-metrics emulation here. Screenshots get CSS-pixel framing from an
   // explicit capture clip instead (see takeScreenshot), which is more direct and
   // touches nothing about the page — no re-layout, no resize handlers fired.
@@ -480,6 +490,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 // Handle user dismissing debugger bar
 chrome.debugger.onDetach.addListener((source, reason) => {
   attachedTabs.delete(source.tabId);
+  signalControl(source.tabId, false); // Lily released the tab — hide the border
 });
 
 // --- CDP event listeners for console and network ---
@@ -3293,7 +3304,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 // Recover MCP tab group state after service worker restart
 async function recoverTabGroupState() {
   try {
-    const groups = await chrome.tabGroups.query({ title: "MCP" });
+    const groups = await chrome.tabGroups.query({ title: "Lily" });
     if (groups.length > 0) {
       tabGroupId = groups[0].id;
       const tabs = await chrome.tabs.query({ groupId: tabGroupId });

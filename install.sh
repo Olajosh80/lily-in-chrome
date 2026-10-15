@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Install script for Open Claude in Chrome extension.
+# Install script for the Lily in Chrome extension.
 # Registers the native messaging host for Chrome, Edge, and Brave on
 # macOS, Linux, and Windows (run under Git Bash / MSYS2 / Cygwin).
 #
@@ -30,7 +30,7 @@ fi
 EXTENSION_IDS=("$@")
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HOST_DIR="$SCRIPT_DIR/host"
-HOST_NAME="com.anthropic.open_claude_in_chrome"
+HOST_NAME="com.pathvela.lily_in_chrome"
 
 # Platform detection. Windows is reached when the script runs under Git Bash,
 # MSYS2, or Cygwin (uname reports MINGW*/MSYS*/CYGWIN*).
@@ -82,7 +82,7 @@ generate_manifest() {
   cat << EOF
 {
   "name": "$HOST_NAME",
-  "description": "Open Claude in Chrome Native Messaging Host",
+  "description": "Lily in Chrome Native Messaging Host",
   "path": "$1",
   "type": "stdio",
   "allowed_origins": [$ORIGINS
@@ -241,12 +241,16 @@ fi
 echo ""
 echo "Done! Next steps:"
 echo ""
-echo "  1. Restart your browser (close all windows and reopen)"
-echo "  2. Add the MCP server to Claude Code:"
+echo "  1. Restart your browser (close all windows and reopen) and make sure the"
+echo "     Lily in Chrome extension is enabled."
 echo ""
-echo "     claude mcp add open-claude-in-chrome -- node \"$MCP_SERVER_DISPLAY\""
+echo "  2. Use it from Lily — no MCP server needed. Lily drives this browser"
+echo "     through its built-in browser tool:"
 echo ""
-echo "  3. Start a new Claude Code session and test:"
+echo "     Ask Lily: \"open reddit.com in my chrome and take a screenshot\""
+echo "     (Lily selects this backend with browser: chrome_extension.)"
 echo ""
-echo '     Ask Claude: "Navigate to reddit.com and take a screenshot"'
+echo "  Optional — to use it from Claude Code over MCP instead:"
+echo ""
+echo "     claude mcp add lily-in-chrome -- node \"$MCP_SERVER_DISPLAY\""
 echo ""

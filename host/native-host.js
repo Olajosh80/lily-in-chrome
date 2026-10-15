@@ -250,7 +250,7 @@ function handleSaveAudit(msg) {
     const dir = path.join(
       os.homedir(),
       ".config",
-      "open-claude-in-chrome",
+      "lily-in-chrome",
       "audits",
       String(msg.session_id || "unknown")
     );
@@ -266,7 +266,7 @@ function handleSaveRecording(msg) {
     const dir = path.join(
       os.homedir(),
       ".config",
-      "open-claude-in-chrome",
+      "lily-in-chrome",
       "recordings",
       String(msg.recording_id || "unknown")
     );
@@ -307,7 +307,7 @@ function handleSaveAudio(msg) {
     const base = path.join(
       os.homedir(),
       ".config",
-      "open-claude-in-chrome",
+      "lily-in-chrome",
       "recordings",
       String(msg.recording_id || "unknown")
     );
@@ -329,7 +329,7 @@ function handleSaveScreenshot(msg) {
     const dir = path.join(
       os.homedir(),
       ".config",
-      "open-claude-in-chrome",
+      "lily-in-chrome",
       "recordings",
       String(msg.recording_id || "unknown"),
       "images"
@@ -343,7 +343,7 @@ function handleSaveScreenshot(msg) {
 }
 
 // Write a full screenshot to a stable, user-visible location
-// (~/.config/open-claude-in-chrome/screenshots/<timestamp>.jpg) so Claude Code
+// (~/.config/lily-in-chrome/screenshots/<timestamp>.jpg) so Claude Code
 // can open the absolute path. Unlike save_screenshot (fire-and-forget), this
 // replies with the written path so the caller can report it to the agent.
 function handleSaveScreenshotToDisk(msg) {
@@ -351,7 +351,7 @@ function handleSaveScreenshotToDisk(msg) {
   const dir = path.join(
     os.homedir(),
     ".config",
-    "open-claude-in-chrome",
+    "lily-in-chrome",
     "screenshots"
   );
   try {
@@ -374,7 +374,7 @@ function handleSaveScreenshotToDisk(msg) {
 function handleWriteTempFile(msg) {
   const reply = (payload) => writeNativeMessage({ id: msg.id, type: "temp_file_written", ...payload });
   try {
-    const dir = path.join(os.homedir(), ".config", "open-claude-in-chrome", "tmp");
+    const dir = path.join(os.homedir(), ".config", "lily-in-chrome", "tmp");
     fs.mkdirSync(dir, { recursive: true });
     // Sanitize the requested name: no path separators, no traversal.
     const name = String(msg.filename || "upload.png").replace(/[^\w.\-]/g, "_");
@@ -482,7 +482,7 @@ const SILENCE_LIMIT_MS = Number(process.env.OCIC_SILENCE_LIMIT_MS) || 60_000;
 // instead. One line, truncated, never grows without bound.
 function recordExit(reason) {
   try {
-    const file = path.join(os.homedir(), ".config", "open-claude-in-chrome", "host-exits.log");
+    const file = path.join(os.homedir(), ".config", "lily-in-chrome", "host-exits.log");
     fs.mkdirSync(path.dirname(file), { recursive: true });
     const line = `${new Date().toISOString()} pid=${process.pid} ${reason}\n`;
     let prev = "";
