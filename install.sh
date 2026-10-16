@@ -5,29 +5,23 @@ set -e
 # Registers the native messaging host for Chrome, Edge, and Brave on
 # macOS, Linux, and Windows (run under Git Bash / MSYS2 / Cygwin).
 #
-# Usage: ./install.sh <extension-id> [extension-id-2] [extension-id-3] ...
+# Usage: ./install.sh [extension-id ...]
 #
-# Pass one extension ID per browser. Each Chromium browser assigns a different
-# ID when loading unpacked extensions, so if you use both Chrome and Brave,
-# pass both IDs.
+# The manifest now ships a stable "key", so EVERY Chromium browser assigns this
+# SAME fixed extension ID on load (packed or unpacked). The native host can
+# therefore trust it without you copying an ID by hand. Pass IDs only to
+# override (e.g. a differently-keyed build).
+STABLE_ID="oofliicdlmpffmhpnlacglocdoaehpgg"
 
-if [ -z "$1" ]; then
-  echo "Usage: ./install.sh <extension-id> [extension-id-2] ..."
+if [ "$#" -gt 0 ]; then
+  EXTENSION_IDS=("$@")
+else
+  EXTENSION_IDS=("$STABLE_ID")
+  echo "Using the stable extension ID from the manifest key: $STABLE_ID"
+  echo "Load the extension/ directory unpacked (Developer Mode) if you haven't —"
+  echo "it will get this exact ID, so the Lily bridge connects every time."
   echo ""
-  echo "Pass one extension ID per browser you want to use."
-  echo "Each browser assigns a different ID to the same unpacked extension."
-  echo ""
-  echo "Steps:"
-  echo "  1. Open chrome://extensions (and/or brave://extensions)"
-  echo "  2. Enable Developer Mode"
-  echo "  3. Click 'Load unpacked' and select the extension/ directory"
-  echo "  4. Copy the extension ID shown under the extension name"
-  echo "  5. Repeat for each browser"
-  echo "  6. Run: ./install.sh <chrome-id> <brave-id>"
-  exit 1
 fi
-
-EXTENSION_IDS=("$@")
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HOST_DIR="$SCRIPT_DIR/host"
 HOST_NAME="com.pathvela.lily_in_chrome"

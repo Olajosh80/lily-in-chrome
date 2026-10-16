@@ -2,7 +2,8 @@
   "manifest_version": 3,
   "name": "Lily in Chrome",
   "version": "1.0.0",
-  "description": "Lily drives your browser — your real tabs and sign-ins — from Pathvela. Any Chromium browser, no remote-debugging prompt.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAl4SV31d8p25WJuSTn1dQhdbX1k3dVd9dkGEP8rYi7VZ54iaVWilw22SmY8qNY+0FqSa/jwXBIYLe22O5xuAaRuCtoWLBtZrGyT6Qp5GqbB/jeI409FwIEy8QC72PRIWl49jloaKe+WUYycuuvHeBfxvk6aaQmJnYUweWqau/ABvLYJ7s3cik14IRj+sIsWe+3wzHt3+tnE0hvEwPKL2J7NIuyoDeln5h6ITYPvn0GiPxR+Oz5Z5ae1VaA/gLHehtKDCJKfSKOIyRjjxkwKDQDZRZ3DMcv1bHVx9HhA0wkYrGPAmM1jhpRZQ9Cx/nUQEJTCnqEgdIYpdevjql2Mc/HwIDAQAB",
+  "description": "Lily drives your browser \u2014 your real tabs and sign-ins \u2014 from Pathvela. Any Chromium browser, no remote-debugging prompt.",
   "minimum_chrome_version": "116",
   "permissions": [
     "tabs",
