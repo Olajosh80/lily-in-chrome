@@ -346,11 +346,38 @@ async function ensureTabGroup(createIfEmpty) {
 
   if (!createIfEmpty) return;
 
-  // Create a new window with a tab, group it. focused:false — the window is
-  // created and rendered, but does not jump in front of whatever the operator
-  // is doing. set_tab_focus raises it on purpose when that is actually wanted.
-  const win = await chrome.windows.create({ focused: false, url: "about:blank" });
-  const tab = win.tabs[0];
+  // Open Lily's automation tab INSIDE the window the operator is already using
+  // — a new BACKGROUND tab in their current (last-focused) normal window,
+  // grouped as "Lily" — rather than a detached window. People expect Lily to
+  // drive the browser session they actually have open, alongside their own tabs
+  // and sign-ins, not a separate window off to the side. active:false means it
+  // never steals focus or yanks them off their current tab (that was the whole
+  // point of issue #28); set_tab_focus still raises it when surfacing it is
+  // actually wanted. Lily only ever acts on tabs in its own group, so the
+  // operator's other tabs stay untouched. A background tab in a visible window
+  // still renders for screenshots — the same background-tab path automation
+  // already uses.
+  let windowId;
+  try {
+    const last = await chrome.windows.getLastFocused({ populate: false });
+    if (last && last.type === "normal") windowId = last.id;
+  } catch {}
+  if (windowId == null) {
+    try {
+      const normals = await chrome.windows.getAll({ windowTypes: ["normal"] });
+      if (normals.length) windowId = normals[normals.length - 1].id;
+    } catch {}
+  }
+
+  let tab;
+  if (windowId != null) {
+    tab = await chrome.tabs.create({ windowId, active: false, url: "about:blank" });
+  } else {
+    // No normal window exists yet (only the service worker is up): fall back to
+    // a fresh unfocused window so automation still has somewhere to run.
+    const win = await chrome.windows.create({ focused: false, url: "about:blank" });
+    tab = win.tabs[0];
+  }
   const groupId = await chrome.tabs.group({ tabIds: [tab.id] });
   // "cyan" is the closest of Chrome's named tab-group colors to Lily's teal.
   await chrome.tabGroups.update(groupId, { title: "Lily", color: "cyan" });
