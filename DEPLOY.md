@@ -15,8 +15,9 @@ The Web Store API can *update* an item but can't *create* the first one.
 2. **Add new item** → upload `dist/lily-in-chrome-1.0.0.zip` (run `npm run build`
    first).
 3. Fill the listing from [`store/listing.md`](store/listing.md) and set the
-   **privacy policy URL** (host [`store/privacy-policy.md`](store/privacy-policy.md)
-   somewhere, e.g. `https://pathvela.com/lily-in-chrome/privacy`).
+   **privacy policy URL** to `https://pathvela.com/lily-in-chrome/privacy`
+   (hosted in poolotlms at `app/lily-in-chrome/privacy`; deploy poolotlms so it is
+   live before you submit).
 4. Set **Visibility = Unlisted** (recommended for a companion/automation tool),
    then **Submit**. Note the **Item ID** it assigns.
 5. If that Item ID is **not** `oofliicdlmpffmhpnlacglocdoaehpgg`, the key wasn't

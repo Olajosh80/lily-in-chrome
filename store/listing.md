@@ -62,5 +62,6 @@ instructions).
 
 ## Privacy
 - Data use: performs the user's requested actions only; not sold or used for
-  ads/profiling. Full policy: host `store/privacy-policy.md` and link it.
+  ads/profiling. Privacy policy URL: https://pathvela.com/lily-in-chrome/privacy
+  (hosted in poolotlms; `store/privacy-policy.md` is the source text).
 - Visibility recommendation: **Unlisted** (companion/automation tool).
