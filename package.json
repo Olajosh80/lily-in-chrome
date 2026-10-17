@@ -1,0 +1,15 @@
+{
+  "name": "lily-in-chrome",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Lily drives your real browser from Pathvela.",
+  "scripts": {
+    "build": "bash scripts/build.sh",
+    "upload": "npm run build && chrome-webstore-upload upload --source dist/lily-in-chrome-$npm_package_version.zip",
+    "deploy": "npm run build && chrome-webstore-upload upload --source dist/lily-in-chrome-$npm_package_version.zip --auto-publish",
+    "deploy:testers": "npm run build && chrome-webstore-upload upload --source dist/lily-in-chrome-$npm_package_version.zip --auto-publish --publish-target trustedTesters"
+  },
+  "devDependencies": {
+    "chrome-webstore-upload-cli": "^3.3.0"
+  }
+}

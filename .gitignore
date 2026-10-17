@@ -24,3 +24,6 @@ DO_NOT_COMMIT/
 # Extension signing key — keep SECRET, back up securely, never commit
 key.pem
 *.pem
+
+# Store build artifacts
+dist/
