@@ -160,6 +160,16 @@ if (chrome.commands && chrome.commands.onCommand) {
 }
 
 // --- Native messaging ---
+// Reconnect backoff. The first retry stays fast (250ms) so a transient drop —
+// the SW slept, the host cycled on restart — is invisible to an in-flight tool
+// call. But a genuinely dead or misconfigured host (native host not installed,
+// origin not allowed) would otherwise retry ~4×/sec forever, so consecutive
+// failures ease off to a cap. Any message from the host (proof it is alive)
+// resets it to the floor.
+const RECONNECT_MIN_MS = 250;
+const RECONNECT_MAX_MS = 5000;
+let reconnectDelay = RECONNECT_MIN_MS;
+
 function connectNativeHost() {
   if (nativePort) return;
   // Honor a switch_browser release window: stay disconnected so another
@@ -172,6 +182,8 @@ function connectNativeHost() {
     nativePort = chrome.runtime.connectNative(NATIVE_HOST_NAME);
 
     nativePort.onMessage.addListener((msg) => {
+      // Any message is proof the host is alive — reset the reconnect backoff.
+      reconnectDelay = RECONNECT_MIN_MS;
       // Heartbeat acks (and any other non-request server-originated messages)
       // are intentionally ignored here — only tool_request kicks work.
       if (msg.type === "tool_request" && msg.id) {
@@ -214,11 +226,11 @@ function connectNativeHost() {
       dbg("port", `native host disconnected`, { err: err && String(err.message).slice(0, 120) });
       nativePort = null;
       stopHeartbeat();
-      // Retry quickly. Reconnect latency dominates per-call wall-clock when
-      // the SW just slept; 250ms is the right floor — fast enough to be
-      // invisible to a single tool call, slow enough not to busy-spin on a
-      // genuinely dead host (which will be retried again on next alarm).
-      setTimeout(connectNativeHost, 250);
+      // Retry fast first (reconnect latency dominates per-call wall-clock when
+      // the SW just slept), then back off so a dead host does not busy-spin; a
+      // live host's first message resets the delay to the floor.
+      setTimeout(connectNativeHost, reconnectDelay);
+      reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_MS);
     });
 
     startHeartbeat();
@@ -226,7 +238,8 @@ function connectNativeHost() {
   } catch (e) {
     nativePort = null;
     stopHeartbeat();
-    setTimeout(connectNativeHost, 250);
+    setTimeout(connectNativeHost, reconnectDelay);
+    reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_MS);
   }
 }
 
