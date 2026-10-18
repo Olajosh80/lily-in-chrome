@@ -121,14 +121,21 @@ async function isBrave() {
 }
 
 // --- Keep-alive alarm ---
-// Backstop wake-up for the MV3 service worker. The proactive heartbeat
-// inside connectNativeHost (~15s) is the primary mechanism; this alarm
-// covers cases where the SW is fully evicted between heartbeats.
+// Backstop wake-up for the MV3 service worker. The strong keep-alive loop
+// (getPlatformInfo every ~20s) keeps the worker resident while it is running;
+// this alarm is the recovery path for when the worker was fully evicted anyway
+// — the machine slept, Chrome force-reclaimed it — and nothing is left running
+// to notice. 0.4min is clamped to Chrome's floor for a packed extension; that
+// is fine, it is only insurance.
 chrome.alarms.create("keepalive", { periodInMinutes: 0.4 });
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === "keepalive") {
-    if (!nativePort) connectNativeHost();
-  }
+  if (alarm.name !== "keepalive") return;
+  // Resurrect BOTH the port and the keep-alive loop, unconditionally. Only
+  // reconnecting the port (the old behavior) left the revived worker free to
+  // idle straight back out in ~30s — which is exactly what cycled the host
+  // every time nothing was actively driving (see host-exits.log).
+  startStrongKeepAlive();
+  if (!nativePort) connectNativeHost();
 });
 
 // --- Voice typing shortcut ---
@@ -170,10 +177,11 @@ function connectNativeHost() {
       if (msg.type === "tool_request" && msg.id) {
         handleToolRequest(msg.id, msg.tool, msg.args || {});
       } else if (msg.type === "set_keepalive") {
-        // The host reports whether a client (Lily) is attached. Hold the
-        // service worker awake only while one is, so the native port cannot die
-        // mid-session; let it idle again when the last client leaves.
-        if (msg.active) startStrongKeepAlive();
+        // The host reports whether a client (Lily) is attached. We now hold the
+        // worker awake continuously (ALWAYS_AWAKE) so the native host never
+        // watchdog-dies between sessions and Lily can attach instantly — so an
+        // attached client only reaffirms it, and detaching never tears it down.
+        if (msg.active || ALWAYS_AWAKE) startStrongKeepAlive();
         else stopStrongKeepAlive();
       } else if (msg.type === "recording_saved") {
         // Reply from the native host after writing a recording bundle to disk.
@@ -214,6 +222,7 @@ function connectNativeHost() {
     });
 
     startHeartbeat();
+    if (ALWAYS_AWAKE) startStrongKeepAlive();
   } catch (e) {
     nativePort = null;
     stopHeartbeat();
@@ -247,16 +256,21 @@ function stopHeartbeat() {
   }
 }
 
-// --- Strong keep-alive while a client is driving ---
+// --- Strong keep-alive (always on) ---
 // An MV3 service worker is evicted after ~30s idle, which kills the native port
-// under an in-flight request — the failure that made the bridge intermittent.
-// The 15s heartbeat posts a native message, but that did not reliably reset
+// — and with it the host, whose deaf-extension watchdog exits after 60s of
+// silence. That is the whole reason the bridge was intermittent: between Lily
+// commands nothing drove the worker, it idled out, the host died, and the next
+// command raced a cold reconnect (host-exits.log is full of these).
+//
+// The 15s heartbeat posts a native message, but that does NOT reliably reset
 // Chrome's idle timer. A cheap async chrome API call DOES count as activity, so
-// while a client (Lily) is attached we call one every ~20s and the worker stays
-// alive continuously. The attached state is persisted in session storage so a
-// worker that is torn down and restarted (e.g. by the keepalive alarm) re-arms
-// itself. When the last client detaches we stop, and the worker idles normally
-// again — zero background cost when nothing is driving.
+// we call one every ~20s and the worker stays resident continuously. We now do
+// this ALWAYS while the extension is enabled — not only while a client is
+// attached — so the host never watchdog-dies and Lily attaches instantly every
+// time. Cost: one getPlatformInfo every 20s, negligible. Flip ALWAYS_AWAKE to
+// false to fall back to the old attach-gated behavior.
+const ALWAYS_AWAKE = true;
 let keepAliveTimer = null;
 function startStrongKeepAlive() {
   try {
@@ -272,6 +286,9 @@ function startStrongKeepAlive() {
 }
 
 function stopStrongKeepAlive() {
+  // In always-awake mode the worker must never stand down, so a stop request
+  // (the host reporting the last client left) is ignored.
+  if (ALWAYS_AWAKE) return;
   if (keepAliveTimer) {
     clearInterval(keepAliveTimer);
     keepAliveTimer = null;
@@ -281,12 +298,17 @@ function stopStrongKeepAlive() {
   } catch {}
 }
 
-// Re-arm after a service-worker restart if a client was attached when it slept.
-try {
-  chrome.storage.session.get("lilyKeepAlive", (v) => {
-    if (v && v.lilyKeepAlive) startStrongKeepAlive();
-  });
-} catch {}
+// Re-arm after a service-worker restart. In always-awake mode start
+// unconditionally; otherwise only if a client was attached when it slept.
+if (ALWAYS_AWAKE) {
+  startStrongKeepAlive();
+} else {
+  try {
+    chrome.storage.session.get("lilyKeepAlive", (v) => {
+      if (v && v.lilyKeepAlive) startStrongKeepAlive();
+    });
+  } catch {}
+}
 
 function sendResponse(id, result) {
   if (!nativePort) return;
