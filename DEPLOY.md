@@ -31,22 +31,31 @@ The Web Store API can *update* an item but can't *create* the first one.
    Copy the **Client ID** and **Client secret** into `.env`.
 
 ### 3. Get a refresh token (once)
-Grant your own account access and capture the refresh token:
-1. Open (replace CLIENT_ID):
-   `https://accounts.google.com/o/oauth2/auth?response_type=code&scope=https://www.googleapis.com/auth/chromewebstore&access_type=offline&prompt=consent&redirect_uri=urn:ietf:wg:oauth:2.0:oob&client_id=CLIENT_ID`
-2. Approve → copy the code, then exchange it:
-   ```bash
-   curl -s https://oauth2.googleapis.com/token \
-     -d client_id=$CLIENT_ID -d client_secret=$CLIENT_SECRET \
-     -d code=PASTE_CODE -d grant_type=authorization_code \
-     -d redirect_uri=urn:ietf:wg:oauth:2.0:oob | grep refresh_token
-   ```
-3. Put the `refresh_token` into `.env` (`REFRESH_TOKEN`). It does not expire.
+Follow Google's current [Chrome Web Store API authorization guide](https://developer.chrome.com/docs/webstore/using-api)
+using the developer account that owns the store item and the
+`https://www.googleapis.com/auth/chromewebstore` scope. Use the guide's OAuth
+Playground flow and its required client/redirect configuration, or a supported
+Desktop-app loopback flow. Do not use the retired `urn:ietf:wg:oauth:2.0:oob`
+copy/paste flow.
+
+Store `CLIENT_ID`, `CLIENT_SECRET`, `REFRESH_TOKEN`, and `EXTENSION_ID` in the
+ignored `.env`. Refresh tokens can expire or be revoked; reauthorize if refresh
+fails. Never commit or paste tokens into build logs.
+
+### Submission checks
+- Confirm the privacy-policy URL loads and complete the dashboard's privacy,
+  permissions justification, screenshots, and reviewer instructions.
+- Unlisted still requires review; submission is not immediate availability.
+- Confirm the actual store-assigned item ID and register it with the native host.
+- For the first submission, use the dashboard. For later uploads, `npm run upload`
+  leaves publication under dashboard control. The pinned upload CLI is a separate
+  integration from Google's current v2 API; verify its response before claiming
+  publication succeeded.
 
 ---
 
 ## Every release
-1. Bump `version` in `extension/manifest.json`.
+1. Bump `version` in BOTH `extension/manifest.json` and `package.json` (and refresh the lockfile). The builder reads the manifest version; upload scripts read the package version.
 2. Load the creds and deploy:
    ```bash
    set -a; source .env; set +a
